@@ -53,12 +53,15 @@ console.log(
 
 }
 
+// Retorna un array vacío por ahora
+// TODO: Implementar parsing de números reales de la página
 return [];
 
 }
 catch(err){
 
 console.log(
+"Error en obtenerResultados:",
 err.message
 );
 

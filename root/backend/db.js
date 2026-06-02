@@ -1,44 +1,63 @@
 require("dotenv").config();
+const path = require("path");
 
-const { Pool } = require("pg");
+let db;
+const isDev = process.env.NODE_ENV !== 'production';
 
-const pool = new Pool({
-    connectionString:
-        process.env.DATABASE_URL,
+if (isDev) {
+    // DESARROLLO LOCAL: SQLite
+    const sqlite3 = require("sqlite3").verbose();
+    db = new sqlite3.Database(
+        path.join(__dirname, "loteria.db"),
+        (err) => {
+            if (err) {
+                console.log("Error SQLite:", err.message);
+            } else {
+                console.log("✅ SQLite OK (LOCAL)");
+                initDBSQLite();
+            }
+        }
+    );
+} else {
+    // PRODUCCIÓN RENDER: PostgreSQL
+    const { Pool } = require("pg");
+    db = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
+    
+    console.log("✅ PostgreSQL conectado (RENDER)");
+    // Las tablas ya existen en Supabase, no las recreamos
+}
 
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-async function init() {
-
-    await pool.query(`
+function initDBSQLite() {
+    db.run(`
         CREATE TABLE IF NOT EXISTS coincidencias (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             placa TEXT,
             loteria TEXT,
             numero TEXT,
-            fecha TIMESTAMP DEFAULT NOW()
+            fecha DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
-    await pool.query(`
+    db.run(`
         CREATE TABLE IF NOT EXISTS resumen_diario (
-            id SERIAL PRIMARY KEY,
-            fecha DATE,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT,
+            placa TEXT,
+            coincidencias INTEGER,
             estado TEXT,
             detalle TEXT
         )
     `);
 
-    console.log(
-        "PostgreSQL OK"
-    );
-
+    db.run(`
+        CREATE TABLE IF NOT EXISTS placas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            placa TEXT UNIQUE
+        )
+    `);
 }
 
-module.exports = {
-    pool,
-    init
-};
+module.exports = db;

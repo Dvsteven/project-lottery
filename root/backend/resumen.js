@@ -6,7 +6,7 @@ async function generarResumen(){
 const hoy =
 new Date()
 .toISOString()
-split("T")[0];
+.split("T")[0];
 
 db.all(
 `

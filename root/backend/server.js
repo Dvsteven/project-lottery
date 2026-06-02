@@ -11,7 +11,7 @@ const { generarResumen } = require("./resumen");
 const app = express();
 app.use(
     express.static(
-        path.join(__dirname, "public")
+        path.join(__dirname, "public", "Frontend")
     )
 );
 
