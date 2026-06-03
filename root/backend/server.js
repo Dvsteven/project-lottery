@@ -1,162 +1,161 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
+// Usar URL relativa para funcionar tanto en local como en Render
+const API_BASE = "";
 
-const db = require("./db");
-const { revisar } = require("./watchdog");
-const { obtenerResultados, obtenerResultadosDiaAnterior } = require("./loterias");
-const { enviarAlerta } = require("./telegram");
-const { generarResumen } = require("./resumen");
+async function cargarResumen() {
+    try {
+        const response = await fetch(`${API_BASE}/resumen`);
+        const datos = await response.json();
 
-const app = express();
-app.use(
-    express.static(
-        path.join(__dirname, "public", "Frontend")
-    )
-);
+        console.log("📊 Resumen:", datos);
 
-app.use(cors());
-app.use(express.json());
+        if (!datos || datos.length === 0) {
+            document.getElementById("resumen").innerHTML = "<p class='text-gray-500'>Sin datos registrados</p>";
+            return;
+        }
 
-// 🔹 Función para generar números a partir de la placa
-function generarNumeros(placa) {
-    let n = placa.replace(/\D/g, "");
-    if (!n) return [];
+        let htmlResumen = "<ul class='space-y-2'>";
 
-    return [
-        n,
-        n.split("").reverse().join(""),
-        n.padStart(3, "0"),
-        n.padEnd(3, "0")
-    ];
+        datos.slice(0, 5).forEach(item => {
+            const fecha = new Date(item.fecha).toLocaleDateString('es-ES');
+            htmlResumen += `
+                <li class="flex justify-between items-center border-b pb-2">
+                    <span class="text-sm md:text-base">
+                        <strong>${fecha}</strong>
+                        <span class="text-gray-600 ml-2">${item.coincidencias || 0} coincidencias</span>
+                    </span>
+                    <span class="text-xs md:text-sm px-2 py-1 rounded-full ${item.estado === 'COINCIDENCIA' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                        ${item.estado || 'N/A'}
+                    </span>
+                </li>
+            `;
+        });
+
+        htmlResumen += "</ul>";
+        document.getElementById("resumen").innerHTML = htmlResumen;
+
+    } catch (error) {
+        console.error("Error cargando resumen:", error);
+    }
 }
 
-// 🔹 Endpoint para consultar coincidencias en tiempo real
-app.post("/consultar", async (req, res) => {
-    let placa = req.body.placa;
-    let numeros = generarNumeros(placa);
-
-    let resultados = await obtenerResultados();
-
-    let coincidencias = resultados.filter(r =>
-        numeros.includes(r.numero)
-    );
-
-    coincidencias.forEach(c => {
-        db.run(
-            `INSERT OR IGNORE INTO coincidencias
-            (placa, loteria, numero)
-            VALUES (?,?,?)`,
-            [placa, c.loteria, c.numero],
-            function(err) {
-                if (err) {
-                    console.log(err);
-                    return;
-                }
-                if (this.changes > 0) {
-                    console.log("🚨 Nueva coincidencia");
-                    enviarAlerta(
-                        `🚨 COINCIDENCIA
-
-Placa: ${placa}
-Lotería: ${c.loteria}
-Número: ${c.numero}`
-                    );
-                }
-            }
-        );
-    });
-
-    res.json({ placa, numeros, coincidencias });
-});
-
-// 🔹 Endpoint para agregar placa manualmente
-app.post("/placa", (req, res) => {
-    db.run("INSERT INTO placas (placa) VALUES (?)", [req.body.placa]);
-    res.json({ ok: true });
-});
-
-// 🔹 Endpoint para consultar coincidencias guardadas
-app.get("/coincidencias", (req, res) => {
-    db.all("SELECT * FROM coincidencias ORDER BY id DESC", [], (err, rows) => {
-        if (err) return res.status(500).json(err);
-        res.json(rows);
-    });
-});
-
-// 🔹 Nuevo endpoint para dashboard (últimas 50 coincidencias)
-app.get("/dashboard", (req, res) => {
-    db.all(
-        `
-        SELECT
-        placa,
-        loteria,
-        numero,
-        fecha
-        FROM coincidencias
-        ORDER BY fecha DESC
-        LIMIT 50
-        `,
-        [],
-        (err, rows) => {
-            if (err) {
-                return res.status(500).json(err);
-            }
-            res.json(rows);
-        }
-    );
-});
-
-// 🔹 Endpoint para obtener resumen diario
-app.get("/resumen",(req,res)=>{
-
-db.all(
-`
-SELECT *
-FROM resumen_diario
-ORDER BY fecha DESC
-LIMIT 30
-`,
-[],
-(err,rows)=>{
-
-res.json(rows);
-
-});
-
-});
-
-// 🔹 Endpoint para obtener resultados del día anterior
-app.get("/resultados-anterior", async (req, res) => {
+async function cargarResultadosAnterior() {
     try {
-        const resultados = await obtenerResultadosDiaAnterior();
-        res.json({
-            fecha: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0],
-            resultados: resultados
+        console.log("📅 Cargando resultados del día anterior del servidor");
+        const response = await fetch(`${API_BASE}/resultados-anterior`);
+        const datos = await response.json();
+
+        // Actualizar fecha
+        const ayer = new Date();
+        ayer.setDate(ayer.getDate() - 1);
+        const fechaFormato = ayer.toLocaleDateString('es-ES', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-    } catch (err) {
-        console.log("Error en /resultados-anterior:", err.message);
-        res.status(500).json({ error: "Error obteniendo resultados del día anterior" });
-    }
-});
+        document.getElementById("fecha-anterior").textContent =
+            fechaFormato.charAt(0).toUpperCase() + fechaFormato.slice(1);
 
-
-// 🔹 Servidor con CRON simple
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`Servidor OK en puerto ${PORT}`);
-
-    // Cada 10 minutos ejecuta revisar()
-    setInterval(() => {
-        revisar();
-    }, 1000 * 60 * 10);
-
-    // Cada minuto revisa si son las 18:00 exactas
-    setInterval(() => {
-        let ahora = new Date();
-        if (ahora.getHours() === 18 && ahora.getMinutes() === 0) {
-            generarResumen();
+        // Renderizar resultados
+        if (!datos.resultados || datos.resultados.length === 0) {
+            document.getElementById("resultados-anterior").innerHTML =
+                "<div class='text-center text-gray-500 col-span-2 md:col-span-4'>Sin resultados disponibles</div>";
+            return;
         }
-    }, 60000);
-});
+
+        let htmlResultados = "";
+        datos.resultados.forEach(resultado => {
+            htmlResultados += `
+                <div class="bg-white rounded-lg p-4 shadow-sm border-t-4 border-blue-500 hover:shadow-md transition">
+                    <div class="text-xs text-gray-500 font-semibold uppercase mb-2">
+                        ${resultado.loteria}
+                    </div>
+                    <div class="text-2xl md:text-3xl font-bold text-blue-600">
+                        ${resultado.numero}
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById("resultados-anterior").innerHTML = htmlResultados;
+
+    } catch (error) {
+        console.error("Error cargando resultados del día anterior:", error);
+        document.getElementById("resultados-anterior").innerHTML =
+            "<div class='text-center text-red-500 col-span-2 md:col-span-4'>Error al cargar resultados</div>";
+    }
+}
+
+async function cargarDashboard() {
+    try {
+        const response = await fetch(`${API_BASE}/dashboard`);
+        const datos = await response.json();
+
+        // ✅ Actualizar "Última revisión" con la hora actual
+        const ahora = new Date();
+        const horaFormato = ahora.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const fechaFormato = ahora.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        document.getElementById("revision").innerText = `${fechaFormato} ${horaFormato}`;
+
+        let html = "";
+
+        datos.forEach(item => {
+            const fecha = new Date(item.fecha).toLocaleString('es-ES', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            html += `
+                <tr class="border-b hover:bg-slate-50 transition">
+                    <td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm">
+                        ${fecha}
+                    </td>
+                    <td class="px-2 md:px-4 py-2 md:py-3 font-semibold text-xs md:text-sm text-blue-600">
+                        ${item.placa}
+                    </td>
+                    <td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm">
+                        ${item.loteria}
+                    </td>
+                    <td class="px-2 md:px-4 py-2 md:py-3 text-sm md:text-base font-bold text-purple-600">
+                        ${item.numero}
+                    </td>
+                </tr>
+            `;
+        });
+
+        document.getElementById("tabla").innerHTML = html ||
+            "<tr><td colspan='4' class='text-center py-4 text-gray-500'>Sin resultados</td></tr>";
+
+        document.getElementById("total").innerText = datos.length;
+
+        await cargarResumen();
+
+    } catch (error) {
+        console.error("Error cargando dashboard:", error);
+        // Aun con error, mostrar hora del intento
+        const ahora = new Date();
+        document.getElementById("revision").innerText =
+            `Error - ${ahora.toLocaleTimeString('es-ES')}`;
+    }
+}
+
+// Cargar al iniciar
+cargarDashboard();
+cargarResultadosAnterior();
+
+// Actualizar dashboard cada 10 segundos
+setInterval(cargarDashboard, 10000);
+
+// Actualizar resultados del día anterior cada 6 horas
+setInterval(cargarResultadosAnterior, 6 * 60 * 60 * 1000);
