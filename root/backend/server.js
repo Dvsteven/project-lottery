@@ -128,8 +128,10 @@ res.json(rows);
 
 
 // 🔹 Servidor con CRON simple
-app.listen(3000, () => {
-    console.log("Servidor OK");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`Servidor OK en puerto ${PORT}`);
 
     // Cada 10 minutos ejecuta revisar()
     setInterval(() => {
