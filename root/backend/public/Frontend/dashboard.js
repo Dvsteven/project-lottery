@@ -40,13 +40,28 @@ async function cargarResumen() {
 
 async function cargarResultadosAnterior() {
     try {
-        const response = await fetch(
-            "http://localhost:3000/resultados-anterior"
-        );
+        // Verificar si hay datos en cache
+        const cache = localStorage.getItem('resultados-anterior-cache');
+        const cacheTime = localStorage.getItem('resultados-anterior-time');
+        const ahora = Date.now();
+        const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 horas en milisegundos
 
-        const datos = await response.json();
+        let datos;
 
-        console.log("📅 Resultados del día anterior:", datos);
+        // Si hay cache y no ha expirado, usarlo
+        if (cache && cacheTime && (ahora - parseInt(cacheTime)) < CACHE_DURATION) {
+            console.log("📅 Usando resultados del día anterior en caché");
+            datos = JSON.parse(cache);
+        } else {
+            // Si no hay cache válido, hacer fetch
+            console.log("📅 Cargando resultados del día anterior del servidor");
+            const response = await fetch("http://localhost:3000/resultados-anterior");
+            datos = await response.json();
+            
+            // Guardar en cache
+            localStorage.setItem('resultados-anterior-cache', JSON.stringify(datos));
+            localStorage.setItem('resultados-anterior-time', ahora.toString());
+        }
 
         // Actualizar fecha
         const ayer = new Date();
@@ -133,7 +148,6 @@ async function cargarDashboard() {
         document.getElementById("total").innerText = datos.length;
 
         await cargarResumen();
-        await cargarResultadosAnterior();
 
     } catch (error) {
 
@@ -144,6 +158,10 @@ async function cargarDashboard() {
 
 // Cargar al iniciar
 cargarDashboard();
+cargarResultadosAnterior(); // Cargar resultados del día anterior al iniciar
 
-// Actualizar cada 10 segundos
+// Actualizar dashboard cada 10 segundos
 setInterval(cargarDashboard, 10000);
+
+// Actualizar resultados del día anterior cada 6 horas (solo si el cache ha expirado)
+setInterval(cargarResultadosAnterior, 6 * 60 * 60 * 1000); // 6 horas
