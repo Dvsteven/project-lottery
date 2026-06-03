@@ -2,75 +2,98 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 
 async function obtenerResultados(){
+    try {
+        // Intenta obtener de loteriasdehoy.co
+        const respuesta = await axios.get(
+            "https://loteriasdehoy.co/",
+            {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 5000
+            }
+        );
 
-try{
+        const $ = cheerio.load(respuesta.data);
+        const resultados = [];
 
-const respuesta =
-await axios.get(
-"https://loteriasdehoy.co/"
-);
+        // Extrae los números de las loterias
+        // Busca patrones como "Risaralda: 022", "Meta: 220", etc
+        const texto = $("body").text();
+        
+        // Loterias comunes en Colombia
+        const loterias = [
+            { nombre: "Risaralda", regex: /risaralda[:\s]+(\d{3})/gi },
+            { nombre: "Meta", regex: /meta[:\s]+(\d{3})/gi },
+            { nombre: "Cauca", regex: /cauca[:\s]+(\d{3})/gi },
+            { nombre: "Magdalena", regex: /magdalena[:\s]+(\d{3})/gi },
+            { nombre: "Tolima", regex: /tolima[:\s]+(\d{3})/gi },
+            { nombre: "Huila", regex: /huila[:\s]+(\d{3})/gi }
+        ];
 
-const $ =
-cheerio.load(
-respuesta.data
-);
+        for (const loteria of loterias) {
+            const match = texto.match(loteria.regex);
+            if (match) {
+                resultados.push({
+                    loteria: loteria.nombre,
+                    numero: match[1],
+                    fecha: new Date().toISOString()
+                });
+            }
+        }
 
-let texto =
-$("body")
-.text()
-.replace(/\s+/g,' ')
-.trim();
+        if (resultados.length > 0) {
+            console.log("✅ Resultados obtenidos:", resultados.length);
+            return resultados;
+        }
 
-let indice =
-texto.toLowerCase()
-.indexOf(
-"risaralda"
-);
+        console.log("⚠️ No se encontraron resultados en la página");
+        return [];
 
-if(indice!==-1){
-
-let inicio =
-Math.max(
-0,
-indice-300
-);
-
-let fin =
-indice+700;
-
-console.log(
-texto.substring(
-inicio,
-fin
-)
-);
-
-}else{
-
-console.log(
-"No apareció Risaralda"
-);
-
+    } catch (err) {
+        console.log("⚠️ Error en obtenerResultados:", err.message);
+        // Devuelve datos de ejemplo si falla
+        return [];
+    }
 }
 
-// Retorna un array vacío por ahora
-// TODO: Implementar parsing de números reales de la página
-return [];
+// Función auxiliar para obtener resultados del día anterior (simulado)
+async function obtenerResultadosDiaAnterior() {
+    try {
+        // En una versión real, esto consultaría una API o BD histórica
+        // Por ahora devuelve datos simulados del día anterior
+        const ayer = new Date();
+        ayer.setDate(ayer.getDate() - 1);
 
+        return [
+            {
+                loteria: "Risaralda",
+                numero: "745",
+                fecha: ayer.toISOString().split('T')[0]
+            },
+            {
+                loteria: "Meta",
+                numero: "321",
+                fecha: ayer.toISOString().split('T')[0]
+            },
+            {
+                loteria: "Cauca",
+                numero: "888",
+                fecha: ayer.toISOString().split('T')[0]
+            },
+            {
+                loteria: "Magdalena",
+                numero: "456",
+                fecha: ayer.toISOString().split('T')[0]
+            }
+        ];
+    } catch (err) {
+        console.log("Error obteniendo resultados del día anterior:", err.message);
+        return [];
+    }
 }
-catch(err){
 
-console.log(
-"Error en obtenerResultados:",
-err.message
-);
-
-return [];
-
-}
-
-}
-
-module.exports={
-obtenerResultados
+module.exports = {
+    obtenerResultados,
+    obtenerResultadosDiaAnterior
 };

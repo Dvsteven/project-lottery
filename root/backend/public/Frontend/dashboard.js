@@ -38,6 +38,57 @@ async function cargarResumen() {
     }
 }
 
+async function cargarResultadosAnterior() {
+    try {
+        const response = await fetch(
+            "http://localhost:3000/resultados-anterior"
+        );
+
+        const datos = await response.json();
+
+        console.log("📅 Resultados del día anterior:", datos);
+
+        // Actualizar fecha
+        const ayer = new Date();
+        ayer.setDate(ayer.getDate() - 1);
+        const fechaFormato = ayer.toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        document.getElementById("fecha-anterior").textContent = fechaFormato.charAt(0).toUpperCase() + fechaFormato.slice(1);
+
+        // Renderizar resultados
+        if (!datos.resultados || datos.resultados.length === 0) {
+            document.getElementById("resultados-anterior").innerHTML = 
+                "<div class='text-center text-gray-500 col-span-2 md:col-span-4'>Sin resultados disponibles</div>";
+            return;
+        }
+
+        let htmlResultados = "";
+        datos.resultados.forEach(resultado => {
+            htmlResultados += `
+                <div class="bg-white rounded-lg p-4 shadow-sm border-t-4 border-blue-500 hover:shadow-md transition">
+                    <div class="text-xs text-gray-500 font-semibold uppercase mb-2">
+                        ${resultado.loteria}
+                    </div>
+                    <div class="text-2xl md:text-3xl font-bold text-blue-600">
+                        ${resultado.numero}
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById("resultados-anterior").innerHTML = htmlResultados;
+
+    } catch (error) {
+        console.error("Error cargando resultados del día anterior:", error);
+        document.getElementById("resultados-anterior").innerHTML = 
+            "<div class='text-center text-red-500 col-span-2 md:col-span-4'>Error al cargar resultados</div>";
+    }
+}
+
 async function cargarDashboard() {
     try {
 
@@ -82,6 +133,7 @@ async function cargarDashboard() {
         document.getElementById("total").innerText = datos.length;
 
         await cargarResumen();
+        await cargarResultadosAnterior();
 
     } catch (error) {
 

@@ -122,6 +122,22 @@
             </table>
         </div>
 
+        <!-- Resultados del Día Anterior -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-4 md:p-6 mb-6 border-l-4 border-blue-500">
+            <h2 class="text-lg md:text-xl font-bold mb-4 text-slate-800 flex items-center">
+                📅 Resultados del día anterior
+                <span class="text-xs md:text-sm ml-2 bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    <span id="fecha-anterior">Ayer</span>
+                </span>
+            </h2>
+            <div id="resultados-anterior" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <!-- Se llena dinámicamente -->
+                <div class="text-center text-gray-500 col-span-2 md:col-span-4">
+                    Cargando resultados...
+                </div>
+            </div>
+        </div>
+
         <!-- Resumen Diario -->
         <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 class="text-lg md:text-xl font-bold mb-4 text-slate-800">

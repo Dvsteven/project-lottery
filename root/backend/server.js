@@ -4,7 +4,7 @@ const path = require("path");
 
 const db = require("./db");
 const { revisar } = require("./watchdog");
-const { obtenerResultados } = require("./loterias");
+const { obtenerResultados, obtenerResultadosDiaAnterior } = require("./loterias");
 const { enviarAlerta } = require("./telegram");
 const { generarResumen } = require("./resumen");
 
@@ -124,6 +124,20 @@ res.json(rows);
 
 });
 
+});
+
+// 🔹 Endpoint para obtener resultados del día anterior
+app.get("/resultados-anterior", async (req, res) => {
+    try {
+        const resultados = await obtenerResultadosDiaAnterior();
+        res.json({
+            fecha: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0],
+            resultados: resultados
+        });
+    } catch (err) {
+        console.log("Error en /resultados-anterior:", err.message);
+        res.status(500).json({ error: "Error obteniendo resultados del día anterior" });
+    }
 });
 
 
